@@ -1,0 +1,10 @@
+*.autosave
+*.user
+build*Debug/
+build*Release/
+build
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+

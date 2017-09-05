@@ -1,0 +1,10 @@
+<RCC>
+    <qresource prefix="/">
+        <file>shaders/fshader.glsl</file>
+        <file>shaders/vshader.glsl</file>
+        <file>shaders/vshader_fluid.glsl</file>
+        <file>shaders/fshader_fluid.glsl</file>
+        <file>shaders/vshader_passthrough.glsl</file>
+        <file>shaders/fshader_simpletexture.glsl</file>
+    </qresource>
+</RCC>

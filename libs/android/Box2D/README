@@ -1,0 +1,6 @@
+add Android.mk Application.mk
+Build Box2D with Android NDK
+
+See: http://www.cnblogs.com/mcxiaoke/archive/2012/07/21/build-box2d-with-ndk-for-android.html
+
+Box2D Version 2.2.1
