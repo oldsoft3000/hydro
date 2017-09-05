@@ -66,7 +66,8 @@ SOURCES += \
     ../shared/poly2tri/sweep/sweep.cc \
     ../shared/poly2tri/sweep/sweep_context.cc \
     geometry/ColorGenerator.cpp \
-    GlobalParams.cpp
+    GlobalParams.cpp \
+    geometry/OutlineNormal.cpp
 
 QT += opengl
 
@@ -112,7 +113,8 @@ HEADERS += \
     ../shared/delaunay-triangulation/triangle.h \
     ../shared/delaunay-triangulation/vector2.h \
     geometry/ColorGenerator.h \
-    GlobalParams.h
+    GlobalParams.h \
+    geometry/OutlineNormal.h
 
 RESOURCES += \
     shaders.qrc

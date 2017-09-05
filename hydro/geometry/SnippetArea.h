@@ -86,20 +86,12 @@ public:
                         QVector3D vertex_1,
                         std::vector<unsigned int>& cell_idxs) {
 
-        //cell_idxs.clear();
-
         int idx_x_0 = (vertex_0.x() - _left) / _width_cell;
         int idx_y_0 = (vertex_0.y() - _top) / _width_cell;
 
         int idx_x_1 = (vertex_1.x() - _left) / _width_cell;
         int idx_y_1 = (vertex_1.y() - _top) / _width_cell;
 
-        /*if (idx_x_0 < 0 || idx_x_0 >= _num_x ||
-            idx_y_0 < 0 || idx_y_0 >= _num_y ||
-            idx_x_1 < 0 || idx_x_1 >= _num_x ||
-            idx_y_1 < 0 || idx_y_1 >= _num_y) {
-            return false;
-        }*/
 
         if (idx_x_0 < 0) {
             idx_x_0 = 0;
@@ -213,10 +205,6 @@ public:
                 }
             }
         }
-
-        //Q_ASSERT(&_cells[cell_idxs.back()] == &_cells[idx_y_1 *_num_x + idx_x_1]);
-        //Q_ASSERT(&_cells[cell_idxs.front()] == &_cells[idx_y_0 *_num_x + idx_x_0]);
-
         return cell_idxs.empty() == false;
     }
 
