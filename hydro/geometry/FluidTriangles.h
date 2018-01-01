@@ -5,6 +5,7 @@
 #include <vector>
 #include <functional>
 #include <cmath>
+#include "Edges.h"
 
 class FluidGeometry;
 typedef std::shared_ptr<FluidGeometry> FluidGeometryPtr;
@@ -13,12 +14,15 @@ typedef std::shared_ptr<ColorGenerator> ColorGeneratorPtr;
 
 const float epsilon_compare = 0.0001;
 
+
+
 class FluidTriangles
 {
-    typedef std::vector<unsigned int> edges_t;
-
-    struct path_data_t {
-        edges_t edges;
+    // search contour results
+    enum SCR {
+        ERROR,
+        CONTINUE,
+        NEXT
     };
 
     struct sector_t {
@@ -49,15 +53,16 @@ private:
 
     static void pushIdxToContour(contour_idxs_t& contour_idxs, GLushort idx);
 
-    OutlineNormals::iterator findFirstNormal(unsigned int idx_row);
-    OutlineNormals::iterator findNextSectors(unsigned int idx_row, OutlineNormals::iterator inormal, sectors_t& sectors);
-    OutlineNormals::iterator findNearestNormal(unsigned int idx_row, OutlineNormals::iterator inormal_0, bool forward);
+    OutlineNormals::iterator findFirstNormal( unsigned int idx_normal, unsigned int idx_row );
+    OutlineNormals::iterator findNextSectors( unsigned int idx_row, OutlineNormals::iterator inormal, sectors_t& sectors );
+    OutlineNormals::iterator findNearestNormal( unsigned int idx_row, OutlineNormals::iterator inormal_0, bool forward );
     int getOffsetFromEnd(int idx_row, OutlineNormals::iterator inormal);
     void addToContour(unsigned int idx_row, int idx_normal, contour_idxs_t& contour_idxs);
 
+    SCR findContour( unsigned int idx_row_0, OutlineNormals::iterator inormal_0, contour_idxs_t& contour_idxs, OutlineNormals::iterator& inormal_next );
 private:
     FluidGeometry&              _fg;
-    std::vector<path_data_t>    _path_data;
+    Edges                       _edges;
     ColorGeneratorPtr           _color_generator;
 
 };

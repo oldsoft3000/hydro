@@ -6,7 +6,6 @@ ColorGenerator::ColorGenerator() : _cc(0)
 }
 
 
-
 QVector4D ColorGenerator::getColor() {
     QVector4D color;
 

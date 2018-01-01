@@ -161,7 +161,6 @@ void FluidGeometry::linkNormalsRadial(OutlineNormals::iterator inormal_0,
 
         inormal_0->links_rad.back().type = inormal_1->links_rad.back().type = LINK_RAD_EQUAL;
     } else {
-        //TODO fix
         auto doLink = [this, &intersection] (OutlineNormals::iterator inormal_0,
                                              OutlineNormals::iterator inormal_1,
                                              bool is_equal_ends) {
@@ -177,7 +176,10 @@ void FluidGeometry::linkNormalsRadial(OutlineNormals::iterator inormal_0,
                 inormal_0->links_rad.back().type = LINK_RAD_BLOCK;
                 inormal_1->links_rad.back().type = LINK_RAD_BRANCH;
                 inormal_0->vertex_end = intersection;
+
+                inormal_1->links_rad.back().idx_row = ( inormal_1->vertex_begin - intersection ).length() / normal_length;
             }
+
 
             inormal_0->is_closed = true;
         };
@@ -218,10 +220,14 @@ void FluidGeometry::linkNormalsTangen(OutlineNormals::iterator inormal,
     inormal_r->links_tan_l.push_back(OutlineNormalLink());
     inormal_r->links_tan_l.back().idx_normal_pair = inormal_l->idx;
     inormal_r->links_tan_l.back().idx_normal = inormal->idx;
+    inormal_r->links_tan_l.back().idx_row = _idx_max_row;
+    inormal_r->links_tan_l.back().type = LINK_TAN;
 
     inormal_l->links_tan_r.push_back(OutlineNormalLink());
     inormal_l->links_tan_r.back().idx_normal_pair = inormal_r->idx;
     inormal_l->links_tan_r.back().idx_normal = inormal->idx;
+    inormal_l->links_tan_r.back().idx_row = _idx_max_row;
+    inormal_l->links_tan_r.back().type = LINK_TAN;
 
     inormal->is_closed = true;
 
@@ -638,5 +644,18 @@ void FluidGeometry::fillZ() {
         }
 
     }
+}
+
+int FluidGeometry::getIdxVertex( int idx_normal, int idx_row ) const {
+    if ( (unsigned)idx_normal >= _outline_normals.size() ) {
+        return -1;
+    }
+    const OutlineNormal& normal = _outline_normals[idx_normal];
+
+    if ( (unsigned)idx_row >= normal.indicies.size() ) {
+        return normal.indicies.back();
+    }
+
+    return normal.indicies[idx_row];
 }
 

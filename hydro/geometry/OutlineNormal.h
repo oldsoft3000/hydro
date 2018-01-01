@@ -9,8 +9,7 @@ enum OutlineNormalLinkType {
     LINK_RAD_EQUAL =        0x1,
     LINK_RAD_BLOCK =        0x2,
     LINK_RAD_BRANCH =       0x4,
-    //LINK_TAN_MAIN =         0x8,
-    //LINK_TAN_SECONDARY =    0x10,
+    LINK_TAN =              0x8,
 };
 
 class OutlineNormal;
@@ -28,11 +27,13 @@ struct OutlineNormalLink {
     };
 
     OutlineNormalLinkType   type;
+    int                     idx_row;
 
     OutlineNormalLink() {
         idx_normal_r = -1;
         idx_normal_l = -1;
         type = LINK_NONE;
+        idx_row = -1;
     }
 
 };

@@ -87,6 +87,8 @@ private:
 
     void fillVertices();
     void fillZ();
+
+    int getIdxVertex( int idx_normal, int idx_row ) const;
 private:
     unsigned int    _size_line;
 
