@@ -41,7 +41,7 @@ void FluidTriangles::triangulate() {
                 } else if ( scr == SCR::ERROR ) {
                     return;
                 }
-            } while ( inormal != inormal_0 );
+            } while ( inormal != inormal_0 && inormal != _fg._outline_normals.end() );
         }
     }
 
