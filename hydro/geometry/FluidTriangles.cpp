@@ -210,7 +210,7 @@ OutlineNormals::iterator FluidTriangles::findFirstNormal( unsigned int idx_norma
 
     OutlineNormals::iterator inormal = _fg._outline_normals.begin() + idx_normal;
 
-    while ( inormal != _fg._outline_normals.end() && idx_row >= inormal->indicies.size() - 1 ) {
+    while ( inormal != _fg._outline_normals.end() && idx_row >= inormal->indicies.size() ) {
         inormal++;
         continue;
     }
