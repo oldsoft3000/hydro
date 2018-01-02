@@ -25,7 +25,7 @@ void FluidTriangles::triangulate() {
     contours_idxs_t contours_idxs;
 
     for (unsigned int idx_row = 0; idx_row < idx_max_row; idx_row++) {
-        OutlineNormals::iterator inormal, inormal_prev = _fg._outline_normals.end();
+        OutlineNormals::iterator inormal, inormal_next;
         OutlineNormals::iterator inormal_0 = inormal = findFirstNormal( 0, idx_row );
 
         if ( inormal != _fg._outline_normals.end() ) {
@@ -33,8 +33,9 @@ void FluidTriangles::triangulate() {
             SCR scr;
 
             do {
-                scr = findContour( idx_row, inormal, contour_idxs, inormal );
+                scr = findContour( idx_row, inormal, contour_idxs, inormal_next );
                 if ( scr == SCR::SUCCESS || scr == SCR::REPEAT ) {
+                    inormal = inormal_next;
                     processContour( contour_idxs, QColor(128, 128, 128, 255) );
                 } else if ( scr == SCR::SEARCH ) {
                     inormal = findFirstNormal( inormal->idx + 1, idx_row );
@@ -435,12 +436,13 @@ FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0, Outline
     int idx_row;
 
     SCR br = processBottom( inormal_0, inormal_1, idx_row, contour_idxs );
-    if ( br != SCR::SUCCESS ) {
-        return br;
+    if ( br == SCR::SUCCESS ) {
+        processSide( inormal_1, idx_row, contour_idxs );
+        processTop( inormal_1, idx_row, contour_idxs );
+        processSide( inormal_0, idx_row, contour_idxs );
+    } else if ( br == SCR::ERROR ) {
+        return SCR::ERROR;
     }
-    processSide( inormal_1, idx_row, contour_idxs );
-    processTop( inormal_1, idx_row, contour_idxs );
-    processSide( inormal_0, idx_row, contour_idxs );
 
     GLushort idx_vertex_0 = _fg.getIdxVertex( inormal_0->idx, idx_row_0 );
 
@@ -449,7 +451,7 @@ FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0, Outline
         return SCR::REPEAT;
     } else {
         inormal_next = inormal_1;
-        return SCR::SUCCESS;
+        return br;
     }
 }
 
