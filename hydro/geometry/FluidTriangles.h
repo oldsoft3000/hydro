@@ -21,8 +21,9 @@ class FluidTriangles
     // search contour results
     enum SCR {
         ERROR,
-        CONTINUE,
-        NEXT
+        SEARCH,
+        REPEAT,
+        SUCCESS
     };
 
     struct sector_t {
