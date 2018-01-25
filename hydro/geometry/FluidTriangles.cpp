@@ -218,7 +218,9 @@ OutlineNormals::iterator FluidTriangles::findFirstNormal( unsigned int idx_norma
     return inormal;
 }
 
-OutlineNormals::iterator FluidTriangles:: findNextSectors(unsigned int idx_row, OutlineNormals::iterator inormal_0, sectors_t& sectors) {
+OutlineNormals::iterator FluidTriangles:: findNextSectors(unsigned int idx_row,
+                                                          OutlineNormals::iterator inormal_0,
+                                                          sectors_t& sectors) {
 
     auto findSector = [this] ( unsigned int idx_row,
                                OutlineNormals::iterator inormal_0,
@@ -329,9 +331,18 @@ void FluidTriangles::addToContour(unsigned int idx_row, int idx_normal, contour_
     }
 }
 
-FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0, OutlineNormals::iterator inormal_0, contour_idxs_t& contour_idxs, OutlineNormals::iterator& inormal_next ) {
+FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0,
+                                                 OutlineNormals::iterator inormal_0,
+                                                 contour_idxs_t& contour_idxs,
+                                                 OutlineNormals::iterator& inormal_next ) {
 
-    auto processBottom = [this, idx_row_0, &inormal_next] ( OutlineNormals::iterator inormal_0, OutlineNormals::iterator& inormal_1, int& idx_row_1, contour_idxs_t& contour_idxs ) -> SCR {
+    typedef std::vector<Edges::list_edge_data_t::iterator> edges_iterators_t;
+    edges_iterators_t edges;
+
+    auto processBottom = [this, idx_row_0, &inormal_next, &edges] ( OutlineNormals::iterator inormal_0,
+                                                            OutlineNormals::iterator& inormal_1,
+                                                            int& idx_row_1,
+                                                            contour_idxs_t& contour_idxs ) -> SCR {
         addToContour( idx_row_0, inormal_0->idx, contour_idxs );
 
         if ( idx_row_0 == 0 ) {
@@ -342,34 +353,52 @@ FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0, Outline
             GLushort idx_vertex_0 = _fg.getIdxVertex( inormal_0->idx, idx_row_0 );
 
             int idx_vertex_1, idx_normal_1;
-            if ( _edges.popEdge( idx_vertex_0, idx_vertex_1, idx_normal_1, idx_row_1 ) == false ) {
-                return SEARCH;
-            }
+            Edges::list_edge_data_t::iterator iedge;
+            int idx_vertex = idx_vertex_0;
 
-            inormal_1 = _fg.getOutlineNormal( idx_normal_1 );
-            if ( inormal_1 == _fg._outline_normals.end() ) {
-                return ERROR;
-            }
+            edges.clear();
+
+            do {
+                if ( _edges.getEdge( inormal_0->idx, idx_vertex, iedge ) == false ) {
+                    return SEARCH;
+                }
+
+                inormal_1 = _fg.getOutlineNormal( iedge->idx_normal );
+                if ( inormal_1 == _fg._outline_normals.end() ) {
+                    return ERROR;
+                }
+                idx_row_1 = iedge->idx_row;
+
+
+                addToContour( idx_row_1, inormal_1->idx, contour_idxs );
+
+                edges.push_back( iedge );
+
+                idx_vertex = _fg.getIdxVertex( inormal_1->idx, idx_row_1 );
+            } while ( iedge->is_tan == true );
 
             if ( getOffsetFromEnd( idx_row_0, inormal_0 ) <= 0 &&
                  getOffsetFromEnd( idx_row_1, inormal_1 ) <= 0 ) {
                 return SEARCH;
+            } else {
+                for ( edges_iterators_t::iterator i = edges.begin(); i != edges.end(); i++ ) {
+                    _edges.delEdge( *i );
+                }
             }
-
-            addToContour( idx_row_0, inormal_1->idx, contour_idxs );
-
         }
         return SUCCESS;
     };
 
-    auto processSide = [this, idx_row_0] ( OutlineNormals::iterator inormal, int idx_row, contour_idxs_t& contour_idxs ) -> bool {
+    auto processSide = [this] ( OutlineNormals::iterator inormal,
+                                           int idx_row,
+                                           contour_idxs_t& contour_idxs ) -> bool {
         if ( getOffsetFromEnd( idx_row, inormal ) <= 0 ) {
             addToContour( idx_row, inormal->idx, contour_idxs );
         } else {
             OutlineNormals::iterator inormal_branch = _fg._outline_normals.end();
             std::vector<OutlineNormalLink>::const_iterator ilink = inormal->links_rad.begin();
             for (; ilink != inormal->links_rad.end(); ++ilink ) {
-                if ( ilink->type == LINK_RAD_BRANCH && ilink->idx_row == idx_row ) {
+                if ( ilink->type == LINK_RAD_BRANCH && ilink->idx_row <= idx_row ) {
                     OutlineNormals::iterator inormal_linked = _fg.getOutlineNormal( ilink->idx_normal );
                     if ( inormal != _fg._outline_normals.end() ) {
                         QVector3D cross = QVector3D::crossProduct( inormal->vertex_end - inormal->vertex_begin,
@@ -391,44 +420,38 @@ FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0, Outline
         return true;
     };
 
-    auto processTop = [this, idx_row_0, inormal_0] ( OutlineNormals::iterator inormal, int idx_row, contour_idxs_t& contour_idxs ) -> bool {
-        OutlineNormals::iterator ilast_normal = inormal;
+    auto processTop = [this, idx_row_0, inormal_0] ( OutlineNormals::iterator inormal,
+                                                                                         int idx_row,
+                                                                                         contour_idxs_t& contour_idxs ) -> bool {
+            int idx_normal_prev = inormal->idx;
+            int idx_row_prev = ( idx_row + 1 >= inormal->indicies.size() ) ? inormal->indicies.size() - 1 : idx_row + 1;
+            int idx_vertex_prev = _fg.getIdxVertex( idx_normal_prev, idx_row_prev );
 
-        int idx_vertex;
-        int idx_vertex_prev = _fg.getIdxVertex( inormal->idx, -1 );
-        int idx_normal_prev = inormal->idx;
-        bool has_tan_links = false;
+            bool has_tan_links = false;
 
-        for (OutlineNormalLinks::const_reverse_iterator ilink = inormal->links_tan_r.rbegin(); ilink != inormal->links_tan_r.rend(); ++ilink) {
-            if ( ilink->type == LINK_TAN && ilink->idx_row <= idx_row ) {
-                addToContour( -1, ilink->idx_normal, contour_idxs );
+            for (OutlineNormalLinks::const_reverse_iterator ilink = inormal->links_tan_r.rbegin(); ilink != inormal->links_tan_r.rend(); ++ilink) {
+                if ( ilink->type == LINK_TAN && ilink->idx_row <= idx_row ) {
+                    addToContour( -1, ilink->idx_normal, contour_idxs );
 
-                int idx_vertex = _fg.getIdxVertex( ilink->idx_normal, _fg._idx_max_row );
-                _edges.pushEdge( idx_vertex, idx_vertex_prev, idx_normal_prev, _fg._idx_max_row );
+                    if ( has_tan_links ) {
+                        idx_row_prev = -1;
+                    }
 
-                idx_vertex_prev = idx_vertex;
-                idx_normal_prev = ilink->idx_normal;
+                    int idx_vertex = _fg.getIdxVertex( ilink->idx_normal, -1 );
+                    _edges.setEdge( inormal_0->idx, idx_vertex, idx_vertex_prev, idx_normal_prev, idx_row_prev, has_tan_links );
 
-                has_tan_links = true;
+                    idx_vertex_prev = idx_vertex;
+                    idx_normal_prev = ilink->idx_normal;
+
+                    has_tan_links = true;
+                }
             }
-        }
 
-        idx_vertex = _fg.getIdxVertex( inormal_0->idx, idx_row + 1 );
+            int idx_vertex = _fg.getIdxVertex( inormal_0->idx, idx_row_0 + 1 );
+            _edges.setEdge( inormal_0->idx, idx_vertex, idx_vertex_prev, idx_normal_prev, idx_row_prev, has_tan_links );
 
-        int idx_row_prev = _fg._idx_max_row;
-
-        if ( has_tan_links ) {
-            idx_row_prev = _fg._idx_max_row;
-        } else {
-            idx_row_prev = idx_row + 1;
-        }
-
-        if ( idx_vertex != idx_vertex_prev ) {
-            _edges.pushEdge( idx_vertex, idx_vertex_prev, idx_normal_prev, idx_row_prev );
-        }
-
-        return true;
-    };
+            return true;
+        };
 
     contour_idxs.clear();
 
@@ -439,14 +462,14 @@ FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0, Outline
     if ( br == SCR::SUCCESS ) {
         processSide( inormal_1, idx_row, contour_idxs );
         processTop( inormal_1, idx_row, contour_idxs );
-        processSide( inormal_0, idx_row, contour_idxs );
-    } else if ( br == SCR::ERROR ) {
-        return SCR::ERROR;
+        processSide( inormal_0, idx_row_0, contour_idxs );
+    } else {
+        return br;
     }
 
     GLushort idx_vertex_0 = _fg.getIdxVertex( inormal_0->idx, idx_row_0 );
 
-    if ( !_edges.isEmpty( idx_vertex_0 ) ) {
+    if ( !_edges.isEmpty( inormal_0->idx, idx_vertex_0 ) ) {
         inormal_next = inormal_0;
         return SCR::REPEAT;
     } else {
