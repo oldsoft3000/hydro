@@ -14,7 +14,7 @@ int OutlineNormal::getOppositeLink( bool cw ) const {
         if ( links_rad.size() == 1 ) {
             return links_rad.back().idx_normal;
         } else {
-            std::vector<OutlineNormalLink>::const_iterator ilink = links_rad.begin();
+            OutlineNormalLinks::const_iterator ilink = links_rad.begin();
             int idx_result = ilink->idx_normal;
             unsigned int max_distance = 0;
             for (; ilink != links_rad.end(); ++ilink ) {

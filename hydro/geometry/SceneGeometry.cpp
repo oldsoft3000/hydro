@@ -22,7 +22,7 @@ void SceneGeometry::generateSceneGeometry() {
 
             vertex_t vertex;
 
-            _verticies.push_back(vertex_t( QVector3D(ix * _size_cell, iy * _size_cell, 0), QVector4D(0.0, 0.0, 0.0, 1.0) ) );
+            _verticies.push_back(vertex_t( QVector3D(ix * _size_cell, iy * _size_cell, 0), QVector4D(0.0, 0.0, 0.0, 0.2) ) );
 
             if ( iy == _num_row || ix == _num_col ) {
                 continue;

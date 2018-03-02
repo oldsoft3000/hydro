@@ -36,7 +36,7 @@ bool FluidGeometryUtils::isSectorsSplitted(OutlineNormals& normals,
                                        OutlineNormals::iterator inormal_1,
                                        OutlineNormals::iterator ispliter) {
     if ( !ispliter->links_rad.empty() ) {
-        std::vector<OutlineNormalLink>::iterator ilink = ispliter->links_rad.begin();
+        OutlineNormalLinks::iterator ilink = ispliter->links_rad.begin();
         for (; ilink != ispliter->links_rad.end(); ++ilink ) {
             if ( isSectorsSplitted( normals, inormal_0, inormal_1, ispliter, normals.begin() + ilink->idx_normal ) ) {
                 return true;

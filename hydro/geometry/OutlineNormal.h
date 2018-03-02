@@ -2,6 +2,7 @@
 #define OUTLINENORMAL_H
 
 #include <vector>
+#include <memory>
 #include <QVector3D>
 
 enum OutlineNormalLinkType {
@@ -38,9 +39,41 @@ struct OutlineNormalLink {
 
 };
 
-typedef std::vector<OutlineNormalLink> OutlineNormalLinks;
+typedef std::list<OutlineNormalLink> OutlineNormalLinks;
+
+enum class InnState {
+    UNKNOWN,
+    FIXED,
+    DELETED,
+    EDITED
+};
+
+/// Intersection type
+
+typedef std::vector<std::pair<int, float>> NrmWeightsT;
+
+struct InnT {
+    QVector3D point;
+    NrmWeightsT normals;
+    float max_weight;
+    float max_koef;
+    InnState state;
+
+    NrmWeightsT::iterator getInnWeightByNormal( int idx_normal ) {
+        NrmWeightsT::iterator iresult = find_if( normals.begin(),
+                        normals.end(),
+                        [idx_normal]( const std::pair<int, float>& nrm_weight )->bool {
+                            return idx_normal == nrm_weight.first; } );
+        return iresult;
+    }
+};
+
+typedef std::shared_ptr<InnT> InnPtr;
+typedef std::list<std::pair<InnPtr, float>> InnWeightsT;
 
 struct OutlineNormal {
+    const std::vector<OutlineNormal>& outline_normals;
+
     QVector3D normal;
     QVector3D vertex_begin;
     QVector3D vertex_end;
@@ -48,17 +81,18 @@ struct OutlineNormal {
     float kL;
     float kZ;
 
-    int idx;
-    bool is_closed;
+    int         idx;
+    bool      is_closed;
 
-    OutlineNormalLink                   link_tan;
+    OutlineNormalLink       link_tan;
 
-    std::vector<OutlineNormalLink>      links_rad;
-    std::vector<OutlineNormalLink>      links_tan_r;
-    std::vector<OutlineNormalLink>      links_tan_l;
+    OutlineNormalLinks      links_rad;
+    OutlineNormalLinks      links_tan_r;
+    OutlineNormalLinks      links_tan_l;
 
-    std::vector<unsigned int>           indicies;
-    const std::vector<OutlineNormal>&   outline_normals;
+    std::vector<unsigned int> indicies;
+
+    InnWeightsT inns;
 
     OutlineNormal( const std::vector<OutlineNormal>& outline_normals );
     bool isClosed() const;

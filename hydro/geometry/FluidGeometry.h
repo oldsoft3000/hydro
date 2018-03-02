@@ -27,6 +27,7 @@ extern const int num_active_rows;
 class FluidGeometry : public GeometryEngine
 {
     friend class FluidTriangles;
+    friend class Edges;
     friend class FluidGeometryTests;
 
     typedef std::pair<OutlineNormals::iterator, OutlineNormals::iterator> sector_t;
@@ -48,6 +49,12 @@ private:
 
     void updateAreaTangen();
     void updateAreaRadial();
+
+    void searchRadialInns();
+    void searchTangenInns();
+    void shrinkRadialInns();
+
+    void updateAreaTangen2();
     void initOutlineNormals(const std::vector<QVector2D>& outline_points);
 
     void growNormal(OutlineNormals::iterator inormal);
@@ -87,6 +94,7 @@ private:
 
     void fillVertices();
     void fillZ();
+    void sortLinks() ;
 
     int getIdxVertex( int idx_normal, int idx_row ) const;
 private:
@@ -104,9 +112,9 @@ private:
     vertex_data_t              _vertex_data_lines;
     vertex_data_t              _vertex_data_triangles;
 
-    std::vector<std::vector<unsigned int>>  _buf_idxs_rad;
-    std::vector<unsigned int>               _buf_idxs_tan;
-
+    std::vector<std::vector<unsigned int>>  _idxs_rad;
+    std::vector<unsigned int>               _idxs_tan;
+    std::vector<InnPtr> _inns;
 
     unsigned int _idx_max_row;
 };

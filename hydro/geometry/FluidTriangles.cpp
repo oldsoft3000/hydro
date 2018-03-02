@@ -10,7 +10,7 @@
 #include <utility>
 #include <algorithm>
 
-FluidTriangles::FluidTriangles(FluidGeometry& fluid_geometry) : _fg(fluid_geometry), _edges( _fg._vertex_data.size() )
+FluidTriangles::FluidTriangles(FluidGeometry& fluid_geometry) : _fg(fluid_geometry), _edges(fluid_geometry)
 {
     _color_generator = std::make_shared<ColorGenerator>();
 }
@@ -46,12 +46,12 @@ void FluidTriangles::triangulate() {
         }
     }
 
-    for ( GeometryEngine::vertex_data_t::iterator idata = _fg._vertex_data.begin(); idata != _fg._vertex_data.end(); ++idata ) {
+    /*for ( GeometryEngine::vertex_data_t::iterator idata = _fg._vertex_data.begin(); idata != _fg._vertex_data.end(); ++idata ) {
         idata->normal.normalize();
 
         QVector3D normal = idata->normal / 30;
         _fg.drawLine( idata->vertex, idata->vertex + normal, QColor(0, 0, 255, 255) );
-    }
+    }*/
 
 }
 
@@ -218,95 +218,6 @@ OutlineNormals::iterator FluidTriangles::findFirstNormal( unsigned int idx_norma
     return inormal;
 }
 
-OutlineNormals::iterator FluidTriangles:: findNextSectors(unsigned int idx_row,
-                                                          OutlineNormals::iterator inormal_0,
-                                                          sectors_t& sectors) {
-
-    auto findSector = [this] ( unsigned int idx_row,
-                               OutlineNormals::iterator inormal_0,
-                               bool cw, sector_t& sector, bool& is_splitted ) -> bool {
-        OutlineNormals::iterator splitter = _fg._outline_normals.end();
-
-        std::function<OutlineNormals::iterator(OutlineNormals::iterator,
-                                               OutlineNormals::iterator,
-                                               OutlineNormals::iterator)> next;
-
-        if ( cw ) {
-            next = inc_cycled<OutlineNormals::iterator>;
-        } else {
-            next = dec_cycled<OutlineNormals::iterator>;
-        }
-
-        OutlineNormals::iterator inormal = inormal_0;
-
-        do {
-            inormal = next( _fg._outline_normals.begin(), _fg._outline_normals.end(), inormal );
-
-            if ( splitter != _fg._outline_normals.end() ) {
-                if ( FluidGeometryUtils::isSectorsSplitted( _fg._outline_normals, inormal_0, inormal, splitter ) ) {
-                    is_splitted = true;
-                    if ( cw ) {
-                        sector.inormal_r = inormal_0;
-                        sector.inormal_l = splitter;
-                    } else {
-                        sector.inormal_r = splitter;
-                        sector.inormal_l = inormal_0;
-                    }
-                    return true;
-                } else {
-                    splitter = inormal;
-                }
-            } else {
-                splitter = inormal;
-            }
-
-        } while ( idx_row >= inormal->indicies.size() - 1 && inormal != inormal_0 );
-
-        if ( inormal == inormal_0 ) {
-            return false;
-        } else {
-            is_splitted = false;
-            sector.inormal_r = inormal_0;
-            sector.inormal_l = inormal;
-            return true;
-        }
-
-    };
-
-    OutlineNormals::iterator inormal = inormal_0;
-    do {
-        inormal = inc_cycled( _fg._outline_normals.begin(), _fg._outline_normals.end(), inormal );
-    } while  ( idx_row >= inormal->indicies.size() - 1 && inormal != inormal_0 );
-
-    sector_t sector(_fg._outline_normals.end(), _fg._outline_normals.end());
-    sectors.clear();
-    bool is_splitted;
-
-    if ( inormal == inormal_0 ) {
-        if ( findSector( idx_row, inormal_0, true, sector, is_splitted ) ) {
-            sectors.push_back( sector );
-            if ( findSector( idx_row, inormal_0, false, sector, is_splitted ) ) {
-                sectors.push_back( sector );
-            } else {
-                Game::instance().getWorldController()->enableUpdates(false);
-            }
-        } else {
-            Game::instance().getWorldController()->enableUpdates(false);
-        }
-        return _fg._outline_normals.end();
-    } else {
-        if ( findSector( idx_row, inormal_0, true, sector, is_splitted ) ) {
-            sectors.push_back( sector );
-            if ( is_splitted ) {
-                if ( findSector( idx_row, inormal, false, sector, is_splitted ) ) {
-                    sectors.push_back( sector );
-                }
-            }
-        }
-        return inormal;
-    }
-}
-
 int FluidTriangles::getOffsetFromEnd(int idx_row, OutlineNormals::iterator inormal) {
     return inormal->indicies.size() - idx_row - 1;
 }
@@ -326,7 +237,7 @@ void FluidTriangles::addToContour(unsigned int idx_row, int idx_normal, contour_
             if ( !contour_idxs.empty() && contour_idxs.back() == idx_vertex ) {
                 return;
             }
-            contour_idxs.push_back( idx_vertex );
+             contour_idxs.push_back( idx_vertex );
         }
     }
 }
@@ -336,10 +247,10 @@ FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0,
                                                  contour_idxs_t& contour_idxs,
                                                  OutlineNormals::iterator& inormal_next ) {
 
-    typedef std::vector<Edges::list_edge_data_t::iterator> edges_iterators_t;
-    edges_iterators_t edges;
+    typedef std::vector<Edges::edge_link_t*> edges_links_t;
+    edges_links_t edge_links;
 
-    auto processBottom = [this, idx_row_0, &inormal_next, &edges] ( OutlineNormals::iterator inormal_0,
+    auto processBottom = [this, idx_row_0, &inormal_next, &edge_links] ( OutlineNormals::iterator inormal_0,
                                                             OutlineNormals::iterator& inormal_1,
                                                             int& idx_row_1,
                                                             contour_idxs_t& contour_idxs ) -> SCR {
@@ -350,39 +261,37 @@ FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0,
             idx_row_1 = 0;
             addToContour( idx_row_0, inormal_1->idx, contour_idxs );
         } else {
-            GLushort idx_vertex_0 = _fg.getIdxVertex( inormal_0->idx, idx_row_0 );
+            Edges::edge_link_t * edge_link;
+            int idx_row = idx_row_0;
+            int idx_normal = inormal_0->idx;
 
-            int idx_vertex_1, idx_normal_1;
-            Edges::list_edge_data_t::iterator iedge;
-            int idx_vertex = idx_vertex_0;
+            edge_links.clear();
 
-            edges.clear();
-
-            do {
-                if ( _edges.getEdge( inormal_0->idx, idx_vertex, iedge ) == false ) {
-                    return SEARCH;
-                }
-
-                inormal_1 = _fg.getOutlineNormal( iedge->idx_normal );
-                if ( inormal_1 == _fg._outline_normals.end() ) {
-                    return ERROR;
-                }
-                idx_row_1 = iedge->idx_row;
-
-
+            while ( _edges.getEdge( inormal_0->idx, idx_normal, idx_row, edge_link ) )  {
+                inormal_1 = _fg.getOutlineNormal( edge_link->next->idx_normal );
+                idx_row_1 = edge_link->next->idx_row;
                 addToContour( idx_row_1, inormal_1->idx, contour_idxs );
 
-                edges.push_back( iedge );
+                if ( std::find( edge_links.begin(), edge_links.end(), edge_link  ) == edge_links.end() ) {
+                    edge_links.push_back( edge_link );
+                } else {
+                    break;
+                }
 
-                idx_vertex = _fg.getIdxVertex( inormal_1->idx, idx_row_1 );
-            } while ( iedge->is_tan == true );
+                idx_row = idx_row_1;
+                idx_normal = inormal_1->idx;
+            }
+
+            if ( edge_links.empty() ) {
+                return SEARCH;
+            }
 
             if ( getOffsetFromEnd( idx_row_0, inormal_0 ) <= 0 &&
                  getOffsetFromEnd( idx_row_1, inormal_1 ) <= 0 ) {
                 return SEARCH;
             } else {
-                for ( edges_iterators_t::iterator i = edges.begin(); i != edges.end(); i++ ) {
-                    _edges.delEdge( *i );
+                for ( auto i : edge_links ) {
+                    _edges.markEdge( *i );
                 }
             }
         }
@@ -393,10 +302,10 @@ FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0,
                                            int idx_row,
                                            contour_idxs_t& contour_idxs ) -> bool {
         if ( getOffsetFromEnd( idx_row, inormal ) <= 0 ) {
-            addToContour( idx_row, inormal->idx, contour_idxs );
+            return true;
         } else {
             OutlineNormals::iterator inormal_branch = _fg._outline_normals.end();
-            std::vector<OutlineNormalLink>::const_iterator ilink = inormal->links_rad.begin();
+            OutlineNormalLinks::const_iterator ilink = inormal->links_rad.begin();
             for (; ilink != inormal->links_rad.end(); ++ilink ) {
                 if ( ilink->type == LINK_RAD_BRANCH && ilink->idx_row <= idx_row ) {
                     OutlineNormals::iterator inormal_linked = _fg.getOutlineNormal( ilink->idx_normal );
@@ -424,34 +333,28 @@ FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0,
                                                                                          int idx_row,
                                                                                          contour_idxs_t& contour_idxs ) -> bool {
             int idx_normal_prev = inormal->idx;
-            int idx_row_prev = ( idx_row + 1 >= inormal->indicies.size() ) ? inormal->indicies.size() - 1 : idx_row + 1;
-            int idx_vertex_prev = _fg.getIdxVertex( idx_normal_prev, idx_row_prev );
-
-            bool has_tan_links = false;
+            int idx_row_prev = ( (unsigned)idx_row + 1 >= inormal->indicies.size() ) ? inormal->indicies.size() - 1 : idx_row + 1;
 
             for (OutlineNormalLinks::const_reverse_iterator ilink = inormal->links_tan_r.rbegin(); ilink != inormal->links_tan_r.rend(); ++ilink) {
-                if ( ilink->type == LINK_TAN && ilink->idx_row <= idx_row ) {
-                    addToContour( -1, ilink->idx_normal, contour_idxs );
-
-                    if ( has_tan_links ) {
+                if ( ilink->type == LINK_TAN && ilink->idx_row <= idx_row  ) {
+                    if ( ilink->idx_normal != inormal_0->idx &&
+                         ilink->idx_normal != idx_normal_prev  ) {
+                        addToContour( -1, ilink->idx_normal, contour_idxs );
+                        _edges.setEdge( inormal_0->idx, ilink->idx_normal, -1, idx_normal_prev, idx_row_prev );
+                        idx_normal_prev = ilink->idx_normal;
                         idx_row_prev = -1;
-                    }
-
-                    int idx_vertex = _fg.getIdxVertex( ilink->idx_normal, -1 );
-                    _edges.setEdge( inormal_0->idx, idx_vertex, idx_vertex_prev, idx_normal_prev, idx_row_prev, has_tan_links );
-
-                    idx_vertex_prev = idx_vertex;
-                    idx_normal_prev = ilink->idx_normal;
-
-                    has_tan_links = true;
+                     }
                 }
             }
 
-            int idx_vertex = _fg.getIdxVertex( inormal_0->idx, idx_row_0 + 1 );
-            _edges.setEdge( inormal_0->idx, idx_vertex, idx_vertex_prev, idx_normal_prev, idx_row_prev, has_tan_links );
+            _edges.setEdge( inormal_0->idx, inormal_0->idx, idx_row_0 + 1, idx_normal_prev, idx_row_prev );
 
             return true;
         };
+
+    if ( inormal_0->indicies.empty() ) {
+        return SCR::ERROR;
+    }
 
     contour_idxs.clear();
 
@@ -467,9 +370,7 @@ FluidTriangles::SCR FluidTriangles::findContour( unsigned int idx_row_0,
         return br;
     }
 
-    GLushort idx_vertex_0 = _fg.getIdxVertex( inormal_0->idx, idx_row_0 );
-
-    if ( !_edges.isEmpty( inormal_0->idx, idx_vertex_0 ) ) {
+    if ( !_edges.isEmpty( inormal_0->idx,  inormal_0->idx, idx_row_0 ) ) {
         inormal_next = inormal_0;
         return SCR::REPEAT;
     } else {
