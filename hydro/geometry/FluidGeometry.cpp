@@ -306,58 +306,45 @@ void FluidGeometry::searchRadialInns() {
     while ( inormal_0 != _outline_normals.end() ) {
         inormal_1 = inormal_0 + 1;
         while ( inormal_1 != _outline_normals.end() ) {
-
             QVector3D point;
             InnWeightsT::iterator iinn;
 
-            iinn = std::find_if( inormal_0->inns.begin(),
-                                 inormal_0->inns.end(),
-                                 [&inormal_1] ( const std::pair<InnPtr, float>& inn_weight ) -> bool {
-                                       NrmWeightsT::iterator inrm_weight = inn_weight.first->getInnWeightByNormal( inormal_1->idx );
-                                       if ( inrm_weight != inn_weight.first->normals.end() ) {
-                                           return true;
-                                       } else {
-                                           return false;
-                                       }
-                                 } );
+            if (getSnippetsInstersection(inormal_0->vertex_begin,
+                                         inormal_0->vertex_end,
+                                         inormal_1->vertex_begin,
+                                         inormal_1->vertex_end,
+                                         point )) {
 
-            if ( iinn == inormal_0->inns.end() ) {
-                if (getSnippetsInstersection(inormal_0->vertex_begin,
-                                             inormal_0->vertex_end,
-                                             inormal_1->vertex_begin,
-                                             inormal_1->vertex_end,
-                                             point )) {
+                iinn = std::find_if( inormal_0->inns.begin(),
+                                     inormal_0->inns.end(),
+                                     [&point] ( const std::pair<InnPtr, float>& inn_weight ) -> bool {
+                                         return isEqualPoints( &point, &inn_weight.first->point );
+                                     } );
 
-                    iinn = std::find_if( inormal_0->inns.begin(),
-                                         inormal_0->inns.end(),
-                                         [&point] ( const std::pair<InnPtr, float>& inn_weight ) -> bool {
-                                             return isEqualPoints( &point, &inn_weight.first->point );
-                                         } );
+                InnPtr inn;
+                float weight_0, weight_1;
 
-                    InnPtr inn;
-                    float weight_0, weight_1;
-
-                    if ( iinn == inormal_0->inns.end() ) {
-                         inn = std::make_shared<InnT>();
-                         inn->point = point;
-                         weight_0 = ( point - inormal_0->vertex_begin ).lengthSquared();
-                         weight_1 = ( point - inormal_1->vertex_begin ).lengthSquared();
-                         inormal_0->inns.push_back( std::make_pair( inn, weight_0 ) );
-                         inormal_1->inns.push_back( std::make_pair( inn, weight_1 ) );
-                         inn->normals.push_back( std::make_pair( inormal_0->idx, weight_0 ) );
-                         inn->normals.push_back( std::make_pair( inormal_1->idx, weight_1 ) );
-                         _inns.push_back( inn );
-                    } else {
-                         inn = iinn->first;
-                         weight_0 = inn->max_weight;
-                         weight_1 = ( point - inormal_1->vertex_begin ).lengthSquared();
-                         inn->normals.push_back( std::make_pair( inormal_1->idx, weight_1 ) );
-                    }
-                    if ( weight_0 < weight_1 ) std::swap(  weight_0, weight_1 );
-                    inn->max_weight = weight_0;
-                    inn->max_koef = weight_0 / weight_1;
+                if ( iinn == inormal_0->inns.end() ) {
+                     inn = std::make_shared<InnT>();
+                     inn->point = point;
+                     weight_0 = ( point - inormal_0->vertex_begin ).lengthSquared();
+                     weight_1 = ( point - inormal_1->vertex_begin ).lengthSquared();
+                     inormal_0->inns.push_back( std::make_pair( inn, weight_0 ) );
+                     inormal_1->inns.push_back( std::make_pair( inn, weight_1 ) );
+                     inn->normals.push_back( std::make_pair( inormal_0->idx, weight_0 ) );
+                     inn->normals.push_back( std::make_pair( inormal_1->idx, weight_1 ) );
+                     _inns.push_back( inn );
+                } else {
+                     inn = iinn->first;
+                     weight_0 = inn->max_weight;
+                     weight_1 = ( point - inormal_1->vertex_begin ).lengthSquared();
+                     inn->normals.push_back( std::make_pair( inormal_1->idx, weight_1 ) );
                 }
+                if ( weight_0 < weight_1 ) std::swap(  weight_0, weight_1 );
+                inn->max_weight = weight_0;
+                inn->max_koef = weight_0 / weight_1;
             }
+
             inormal_1++;
         }
         inormal_0++;
@@ -371,13 +358,13 @@ void FluidGeometry::searchRadialInns() {
                 } );
 }
 
-void FluidGeometry::shrinkRadialInns() {
+void FluidGeometry::cutRadialInns() {
     for ( auto inn : _inns ) {
         if ( inn->state == InnState::UNKNOWN ) {
             for ( auto nrm_weight : inn->normals ) {
                 OutlineNormals::iterator inormal = getOutlineNormal( nrm_weight.first );
                 if ( inormal->is_closed == false ) {
-                    NrmWeightsT::iterator inrm_weight = inn->getInnWeightByNormal( inormal->idx );
+                    NrmWeightsT::iterator inrm_weight = inn->findInnWeightByNormal( inormal->idx );
                     Q_ASSERT( inrm_weight != inn->normals.end() );
                     InnWeightsT::iterator iinn = inormal->inns.begin();
                     while ( iinn != inormal->inns.end() ) {
@@ -394,7 +381,7 @@ void FluidGeometry::shrinkRadialInns() {
             }
             inn->state = InnState::FIXED;
 
-            if ( inn->max_koef > 1.5 && inn->normals.size() == 2 ) {
+            if ( inn->max_koef > 1.001 && inn->normals.size() == 2 ) {
                 OutlineNormals::iterator inormal_0 = getOutlineNormal( inn->normals[0].first );
                 OutlineNormals::iterator inormal_1 = getOutlineNormal( inn->normals[1].first );
 
@@ -405,117 +392,47 @@ void FluidGeometry::shrinkRadialInns() {
 
                 if ( isEqualPoints( &inn->point, &inormal_0->vertex_end ) ) {
                     inormal_0->vertex_end = inormal_0->vertex_begin + inormal_0->normal * ( length_0 - x );
-                    inormal_0->is_closed = false;
-                    inn->state = InnState::EDITED;
+                    //inormal_0->is_closed = false;
+                    inn->state = InnState::CUTED;
                 }
                 if ( isEqualPoints( &inn->point, &inormal_1->vertex_end ) ) {
                     inormal_1->vertex_end = inormal_1->vertex_begin + inormal_1->normal * ( length_1 + x );
-                    inormal_1->is_closed = false;
-                    inn->state = InnState::EDITED;
+                    //inormal_1->is_closed = false;
+                    inn->state = InnState::CUTED;
                 }
             }
         }
-    }
-
-    OutlineNormals::iterator  inormal = _outline_normals.begin();
-
-    while ( inormal != _outline_normals.end() ) {
-        if ( inormal->is_closed == false ) {
-            inormal->inns.clear();
-        } else {
-            InnWeightsT::iterator iinn = inormal->inns.begin();
-            while ( iinn != inormal->inns.end() ) {
-                if ( iinn->first->state != InnState::FIXED ) {
-                    iinn = inormal->inns.erase( iinn );
-                } else {
-                    iinn++;
-                }
-            }
-        }
-        inormal++;
     }
 }
 
-void FluidGeometry::searchTangenInns() {
-    auto isPeak = [this] (OutlineNormals::iterator inormal) -> bool {
-        InnWeightsT::iterator iinn = inormal->inns.begin();
-        while ( iinn != inormal->inns.end() ) {
-            if ( iinn->first->normals.size() == 2 ) {
-                OutlineNormals::iterator inormal_0 = getOutlineNormal( iinn->first->normals[0].first );
-                OutlineNormals::iterator inormal_1 = getOutlineNormal( iinn->first->normals[1].first );
-
-                if ( isEqualPoints( &iinn->first->point, &inormal_0->vertex_end ) &&
-                     isEqualPoints( &iinn->first->point, &inormal_1->vertex_end ) &&
-                     std::abs(distance_cycled( _outline_normals.begin(),
-                                               _outline_normals.end(),
-                                               inormal_0, inormal_1 )) == 1 ) {
-
-                    return true;
-                }
-            }
-            iinn++;
-        }
-        return false;
-    };
-
-    auto cutOuterContour = [this] (const QVector3D& v_0,
-                                   const QVector3D& v_1)  {
+void FluidGeometry::cutOuterInns() {
+    auto cutNormalsOuter = [this] (OutlineNormals::iterator inormal_0,
+                                    OutlineNormals::iterator inormal_1)  {
         OutlineNormals::iterator inormal = _outline_normals.begin();
 
         while ( inormal != _outline_normals.end() ) {
             QVector3D point;
-            if (getSnippetsInstersection(v_0,
-                                         v_1,
+            if (getSnippetsInstersection(inormal_0->vertex_begin,
+                                         inormal_1->vertex_begin,
                                          inormal->vertex_begin,
                                          inormal->vertex_end,
                                          point )) {
-                float length = ( point - inormal->vertex_begin ).length();
-                inormal->vertex_end = inormal->vertex_begin + inormal->normal * length / 2;
-                inormal->is_closed = true;
+                inormal->vertex_end = inormal->vertex_begin + ( point - inormal->vertex_begin ) / 2;
+
             }
             inormal++;
         }
     };
-
-    auto cutInnerContour = [this, canCut] (const QVector3D& v_0,
-                                           const QVector3D& v_1)  {
-        OutlineNormals::iterator inormal = _outline_normals.begin();
-        std::vector<std::pair<OutlineNormals::iterator, QVector3D>> founded;
-        while ( inormal != _outline_normals.end() ) {
-            if ( canCut( inormal ) ) {
-                QVector3D point;
-                if (getSnippetsInstersection(v_0,
-                                             v_1,
-                                             inormal->vertex_begin,
-                                             inormal->vertex_end,
-                                             point )) {
-                    founded.push_back( std::make_pair( inormal, point ) );
-                }
-            }
-            inormal++;
-        }
-
-        for ( auto normal_point : founded ) {
-            normal_point.first->vertex_end = normal_point.second;
-            normal_point.first->is_closed = true;
-        }
-    };
-
 
     std::vector<OutlineNormal>::iterator inormal = _outline_normals.begin();
     std::vector<OutlineNormal>::iterator inormal_prev = _outline_normals.end();
     std::vector<OutlineNormal>::iterator inormal_base = _outline_normals.end();
 
     while (inormal != _outline_normals.end()) {
-        /*if ( canCut( inormal ) ) {
-            inormal++;
-            continue;
-        }*/
-
         if (inormal_prev == _outline_normals.end()) {
             inormal_base = inormal;
         } else {
-            cutInnerContour( inormal_prev->vertex_end, inormal->vertex_end );
+            cutNormalsOuter( inormal_prev, inormal );
         }
 
         inormal_prev = inormal;
@@ -523,39 +440,113 @@ void FluidGeometry::searchTangenInns() {
     }
 
     if (inormal_prev != _outline_normals.end() && inormal_base != _outline_normals.end()) {
-        cutInnerContour( inormal_prev->vertex_end, inormal_base->vertex_end );
+        cutNormalsOuter( inormal_prev, inormal_base );
     }
 
-    inormal = _outline_normals.begin();
-    inormal_prev = _outline_normals.end();
-    inormal_base = _outline_normals.end();
+}
 
-    unsigned int count_closed = std::count_if( _outline_normals.begin(),
-                                      _outline_normals.end(),
-                                      []( const OutlineNormal& normal )->bool {
-                                            return normal.is_closed;
-                                      });
+void FluidGeometry::cutInnerInns() {
+    struct cut_t {
+        int normal;
+        float koef;
+        QVector3D point;
+    };
 
-    if ( count_closed != _outline_normals.size() ) {
-        inormal = _outline_normals.begin();
-        inormal_prev = _outline_normals.end();
-        inormal_base = _outline_normals.end();
+    std::vector<std::vector<cut_t>> cuts;
+    std::vector<bool> supporting_normals;
 
-        while (inormal != _outline_normals.end()) {
-            if (inormal_prev == _outline_normals.end()) {
-                inormal_base = inormal;
-            } else {
-                cutOuterContour( inormal_prev->vertex_begin, inormal->vertex_begin );
+    supporting_normals.resize( _outline_normals.size() );
+    std::fill( supporting_normals.begin(), supporting_normals.end(), false );
+
+    cuts.resize( _outline_normals.size() );
+
+    auto cutNormalsInner = [this,&cuts,&supporting_normals] (OutlineNormals::iterator inormal_0,
+                                                             OutlineNormals::iterator inormal_1)  {
+        OutlineNormals::iterator inormal = _outline_normals.begin();
+
+        while ( inormal != _outline_normals.end() ) {
+            QVector3D point;
+            if (getSnippetsInstersection(inormal_0->vertex_end,
+                                         inormal_1->vertex_end,
+                                         inormal->vertex_begin,
+                                         inormal->vertex_end,
+                                         point )) {
+                if ( !isEqualPoints( &point, &inormal_0->vertex_end ) &&
+                     !isEqualPoints( &point, &inormal_1->vertex_end ) ) {
+
+                    float length_0 = ( point - inormal->vertex_begin ).lengthSquared();
+                    float length_1 = ( inormal->vertex_end - inormal->vertex_begin ).lengthSquared();
+                    float koef = length_1 / length_0;
+
+                    cut_t cut;
+
+                    cut.normal = inormal->idx;
+                    cut.koef = koef;
+                    cut.point = point;
+
+                    cuts[inormal_0->idx].push_back( cut );
+
+                    //if ( koef > 1.2 ) {
+                        int n_0 = inormal->idx;
+                        int n_1 = ( n_0 > 0 ) ? n_0 - 1 : supporting_normals.size() - 1;
+                        supporting_normals[n_0] = true;
+                        supporting_normals[n_1] = true;
+                    //}
+                }
+
             }
-
-            inormal_prev = inormal;
             inormal++;
         }
+    };
 
-        if (inormal_prev != _outline_normals.end() && inormal_base != _outline_normals.end()) {
-            cutOuterContour( inormal_prev->vertex_begin, inormal_base->vertex_begin );
+    std::vector<OutlineNormal>::iterator inormal = _outline_normals.begin();
+    std::vector<OutlineNormal>::iterator inormal_prev = _outline_normals.end();
+    std::vector<OutlineNormal>::iterator inormal_base = _outline_normals.end();
+
+    while (inormal != _outline_normals.end()) {
+        if (inormal_prev == _outline_normals.end()) {
+            inormal_base = inormal;
+        } else {
+            cutNormalsInner( inormal_prev, inormal );
+        }
+
+        inormal_prev = inormal;
+        inormal++;
+    }
+
+    if (inormal_prev != _outline_normals.end() && inormal_base != _outline_normals.end()) {
+        cutNormalsInner( inormal_prev, inormal_base );
+    }
+
+    int c = 0;
+
+    for ( std::vector<std::vector<cut_t>>::iterator icuts = cuts.begin(); icuts != cuts.end(); ++icuts, ++c ) {
+        if ( supporting_normals[c] == false ) {
+            for ( std::vector<cut_t>::iterator icut = icuts->begin(); icut != icuts->end(); ++icut ) {
+                OutlineNormals::iterator inormal = getOutlineNormal( icut->normal );
+                inormal->vertex_end = icut->point;
+            }
+        } else {
+            int n_0 = c;
+            int n_1 = ( n_0 < supporting_normals.size() - 1 ) ? n_0 + 1 : 0;
+            OutlineNormals::iterator inormal_0 = getOutlineNormal( n_0 );
+            OutlineNormals::iterator inormal_1 = getOutlineNormal( n_1 );
+
+            float length_calc = ( ( inormal_0->vertex_end - inormal_0->vertex_begin).length() +
+                                ( inormal_1->vertex_end - inormal_1->vertex_begin).length() ) / 2;
+
+            for ( std::vector<cut_t>::iterator icut = icuts->begin(); icut != icuts->end(); ++icut ) {
+                OutlineNormals::iterator inormal = getOutlineNormal( icut->normal );
+                float length = ( icut->point - inormal->vertex_begin ).length();
+                if ( length / length_calc < 0.8 ) {
+                    inormal->vertex_end = inormal->vertex_begin + inormal->normal * length_calc;
+                } else {
+                    inormal->vertex_end = icut->point;
+                }
+            }
         }
     }
+
 }
 
 void FluidGeometry::linkNormalsRadial(OutlineNormals::iterator inormal_0,
@@ -742,8 +733,9 @@ void FluidGeometry::generateGeometry(const std::vector<QVector2D>& outline_point
     initOutlineNormals(outline_points);
 
     searchRadialInns();
-    shrinkRadialInns();
-    searchTangenInns();
+    cutRadialInns();
+    cutOuterInns();
+    cutInnerInns();
 
     /*while ( growNormals()  && _idx_max_row < 20 ) {
         START_TIMER(MEASURE_UPDATE_RADIAL);

@@ -52,7 +52,10 @@ private:
 
     void searchRadialInns();
     void searchTangenInns();
-    void shrinkRadialInns();
+
+    void cutRadialInns();
+    void cutOuterInns();
+    void cutInnerInns();
 
     void updateAreaTangen2();
     void initOutlineNormals(const std::vector<QVector2D>& outline_points);

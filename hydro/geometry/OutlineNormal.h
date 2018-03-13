@@ -45,7 +45,7 @@ enum class InnState {
     UNKNOWN,
     FIXED,
     DELETED,
-    EDITED
+    CUTED
 };
 
 /// Intersection type
@@ -59,7 +59,7 @@ struct InnT {
     float max_koef;
     InnState state;
 
-    NrmWeightsT::iterator getInnWeightByNormal( int idx_normal ) {
+    NrmWeightsT::iterator findInnWeightByNormal( int idx_normal ) {
         NrmWeightsT::iterator iresult = find_if( normals.begin(),
                         normals.end(),
                         [idx_normal]( const std::pair<int, float>& nrm_weight )->bool {
